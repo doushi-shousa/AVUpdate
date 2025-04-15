@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         Title="AVUpdate"
-        Height="340" Width="500"
+        Height="420" Width="600"
         Icon="AVUpdate.ico"
         Background="{DynamicResource MaterialDesignPaper}">
 
@@ -14,47 +14,75 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
             <!-- Заголовок -->
             <TextBlock Text="Обновление антивируса"
-           FontSize="24"
-           FontWeight="Bold"
-           TextAlignment="Center"
-           HorizontalAlignment="Center"
-           Foreground="{DynamicResource MaterialDesignBody}"
-           Margin="0,0,0,20"/>
+                       FontSize="24"
+                       FontWeight="Bold"
+                       TextAlignment="Center"
+                       HorizontalAlignment="Center"
+                       Foreground="{DynamicResource MaterialDesignBody}"
+                       Margin="0,0,0,20"/>
 
+            <!-- Основной блок -->
+            <StackPanel Grid.Row="1" Margin="0,0,0,10"
+                        materialDesign:ElevationAssist.Elevation="Dp2">
 
-            <!-- Контент -->
-            <StackPanel Grid.Row="1" VerticalAlignment="Top" Margin="0,0,0,20"
-                        materialDesign:ElevationAssist.Elevation="Dp3">
+                <TextBlock x:Name="ArchivePathText"
+                           Text="Архив: -"
+                           Foreground="{DynamicResource MaterialDesignBody}"
+                           FontStyle="Italic"
+                           Margin="0,0,0,5"/>
 
-                <Button x:Name="UpdateButton"
-                        Content="Обновить"
-                        Width="150" Height="40"
-                        Margin="0,0,0,10"
-                        Click="UpdateButton_Click"
-                        Style="{StaticResource MaterialDesignRaisedButton}" />
+                <TextBlock x:Name="TargetPathText"
+                           Text="Путь копирования: -"
+                           Foreground="{DynamicResource MaterialDesignBody}"
+                           FontStyle="Italic"
+                           Margin="0,0,0,15"/>
 
-                <Button x:Name="SettingsButton"
-                        Content="Настройки"
-                        Width="150" Height="40"
-                        Margin="0,0,0,10"
-                        Click="SettingsButton_Click"
-                        Style="{StaticResource MaterialDesignFlatButton}" />
+                <!-- Статусы путей -->
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                    <TextBlock Text="Сетевой путь: "
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource MaterialDesignBody}" />
+                    <Ellipse x:Name="PrimaryStatus" Width="14" Height="14"
+                             Fill="Gray" Margin="5,0"/>
+                </StackPanel>
 
-                <Button x:Name="ThemeButton"
-                        Width="150" Height="40"
-                        Margin="0,0,0,10"
-                        Click="ThemeButton_Click"
-                        Style="{StaticResource MaterialDesignFlatButton}">
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                        <TextBlock x:Name="ThemeIcon" Text="🌙" FontSize="16" Margin="0,0,5,0"/>
-                        <TextBlock Text="Сменить тему"/>
-                    </StackPanel>
-                </Button>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,10"
+                            x:Name="SecondaryStatusPanel">
+                    <TextBlock Text="Второй путь: "
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource MaterialDesignBody}" />
+                    <Ellipse x:Name="SecondaryStatus" Width="14" Height="14"
+                             Fill="Gray" Margin="5,0"/>
+                </StackPanel>
 
+                <!-- Кнопки -->
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                    <Button x:Name="UpdateButton"
+                            Content="Обновить"
+                            Width="140" Height="40" Margin="5"
+                            Click="UpdateButton_Click"
+                            Style="{StaticResource MaterialDesignRaisedButton}" />
+
+                    <Button x:Name="SettingsButton"
+                            Content="Настройки"
+                            Width="140" Height="40" Margin="5"
+                            Click="SettingsButton_Click"
+                            Style="{StaticResource MaterialDesignFlatButton}" />
+
+                    <Button x:Name="ThemeButton"
+                            Width="50" Height="40" Margin="5"
+                            Click="ThemeButton_Click"
+                            Style="{StaticResource MaterialDesignFlatButton}">
+                        <TextBlock x:Name="ThemeIcon" Text="🌙" FontSize="16" HorizontalAlignment="Center" />
+                    </Button>
+                </StackPanel>
+
+                <!-- Статус -->
                 <TextBlock x:Name="StatusText"
                            Text="Ожидание запуска..."
                            FontStyle="Italic"
@@ -63,27 +91,28 @@
             </StackPanel>
 
             <!-- Прогресс -->
-            <StackPanel Grid.Row="2" Orientation="Horizontal" VerticalAlignment="Center">
+            <StackPanel Grid.Row="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,10,0,0">
                 <ProgressBar x:Name="ProgressBar"
-                             Width="400"
+                             Width="500"
                              Height="6"
                              Minimum="0"
                              Maximum="100"
-                             Margin="0,0,10,0"/>
+                             Margin="0,0,10,0"
+                             Background="{DynamicResource MaterialDesignDivider}"
+                             Foreground="{DynamicResource PrimaryHueMidBrush}" />
                 <TextBlock x:Name="ProgressPercent"
-           VerticalAlignment="Center"
-           Text="0%"
-           FontWeight="Bold"
-           Foreground="{DynamicResource MaterialDesignBody}" />
-
+                           VerticalAlignment="Center"
+                           Text="0%"
+                           FontWeight="Bold"
+                           Foreground="{DynamicResource MaterialDesignBody}" />
             </StackPanel>
 
             <!-- Snackbar -->
             <materialDesign:Snackbar x:Name="MainSnackbar"
-                                      VerticalAlignment="Bottom"
-                                      Margin="0,20,0,0"
-                                      Background="{DynamicResource PrimaryHueMidBrush}"
-                                      Foreground="White" />
+                                     Grid.Row="3"
+                                     Margin="0,20,0,0"
+                                     Background="{DynamicResource PrimaryHueMidBrush}"
+                                     Foreground="White" />
         </Grid>
     </materialDesign:DialogHost>
 </Window>
