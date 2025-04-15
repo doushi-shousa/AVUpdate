@@ -1,8 +1,10 @@
 ﻿using System;
+using System.Diagnostics;
 using System.IO;
-using System.IO.Compression; // Для ZipFile и ZipArchive
+using System.IO.Compression;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Media;
 using IniParser;
 using IniParser.Model;
 
@@ -13,167 +15,288 @@ namespace AVUpdate
         private readonly IniData _config;
         private const string ConfigFilePath = "config.ini";
         private const string LogFilePath = "update.log";
-
-        private string NetworkPath => _config["Settings"]["NetworkPath"];
-        private string ArchiveName => _config["Settings"]["ArchiveName"];
+        private bool isDarkTheme = true;
 
         public MainWindow()
         {
             InitializeComponent();
 
-            try
+            var parser = new FileIniDataParser();
+            if (!File.Exists(ConfigFilePath))
             {
-                var parser = new FileIniDataParser();
-
-                if (!File.Exists(ConfigFilePath))
-                {
-                    _config = new IniData();
-                    _config.Sections.AddSection("Settings");
-                    _config["Settings"]["NetworkPath"] = @"\\network\path\updates";
-                    _config["Settings"]["ArchiveName"] = "updates.zip";
-                    parser.WriteFile(ConfigFilePath, _config);
-                    Log("Создан новый config.ini с настройками по умолчанию.");
-                    StatusText.Text = "Создан новый config.ini с настройками по умолчанию.";
-                }
-                else
-                {
-                    _config = parser.ReadFile(ConfigFilePath);
-                    Log("Конфигурация загружена из config.ini.");
-                }
+                _config = CreateDefaultConfig();
+                parser.WriteFile(ConfigFilePath, _config);
+                Log("Создан config.ini по умолчанию.");
             }
-            catch (Exception ex)
+            else
             {
-                Log($"Ошибка при работе с config.ini: {ex.Message}");
-                MessageBox.Show($"Ошибка при работе с config.ini: {ex.Message}");
-                Close();
+                _config = parser.ReadFile(ConfigFilePath);
+                Log("Загружен config.ini.");
+            }
+
+            ApplyThemeFromConfig();
+            LoadThemeIcon();
+            DeleteOldLogs();
+        }
+
+        private IniData CreateDefaultConfig()
+        {
+            var config = new IniData();
+            config.Sections.AddSection("Settings");
+            config["Settings"]["NetworkPath"] = @"\\network\path\updates";
+            config["Settings"]["ArchiveName"] = "kave*.zip";
+            config["Settings"]["UseSecondaryPath"] = "false";
+            config["Settings"]["SecondaryNetworkPath"] = @"\\secondary\path\updates";
+            config["Settings"]["SecondaryUsername"] = "";
+            config["Settings"]["SecondaryPassword"] = "";
+            config["Settings"]["UseCustomSource"] = "false";
+            config["Settings"]["CustomSourcePath"] = "";
+            config["Settings"]["Theme"] = "Dark";
+            return config;
+        }
+
+        private void ApplyThemeFromConfig()
+        {
+            string theme = _config["Settings"].ContainsKey("Theme") ? _config["Settings"]["Theme"] : "Dark";
+            switch (theme)
+            {
+                case "Light":
+                    ApplyLightTheme();
+                    isDarkTheme = false;
+                    break;
+                case "Dark":
+                    ApplyDarkTheme();
+                    isDarkTheme = true;
+                    break;
+                case "System":
+                    ApplyDarkTheme(); // можно расширить позже
+                    isDarkTheme = true;
+                    break;
             }
         }
 
+        private void ThemeButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (isDarkTheme)
+            {
+                ApplyLightTheme();
+                isDarkTheme = false;
+                _config["Settings"]["Theme"] = "Light";
+            }
+            else
+            {
+                ApplyDarkTheme();
+                isDarkTheme = true;
+                _config["Settings"]["Theme"] = "Dark";
+            }
+            LoadThemeIcon();
+            new FileIniDataParser().WriteFile(ConfigFilePath, _config);
+        }
+
+        private void LoadThemeIcon()
+        {
+            ThemeIcon.Text = isDarkTheme ? "☀️" : "🌙";
+        }
+
+        private void ApplyLightTheme()
+        {
+            Background = new SolidColorBrush(Color.FromRgb(245, 245, 245));
+            StatusText.Foreground = new SolidColorBrush(Colors.Black);
+            ProgressBar.Foreground = new SolidColorBrush(Color.FromRgb(0, 120, 215));
+        }
+
+        private void ApplyDarkTheme()
+        {
+            Background = new SolidColorBrush(Color.FromRgb(30, 30, 30));
+            StatusText.Foreground = new SolidColorBrush(Colors.White);
+            ProgressBar.Foreground = new SolidColorBrush(Color.FromRgb(0, 200, 255));
+        }
+
+        private void SetControlsEnabled(bool state)
+        {
+            UpdateButton.IsEnabled = state;
+            SettingsButton.IsEnabled = state;
+            ThemeButton.IsEnabled = state;
+        }
+
+        private void UpdateProgress(double value)
+        {
+            ProgressBar.Value = value;
+            ProgressPercent.Text = $"{(int)value}%";
+        }
+
+        private void ShowMessage(string message)
+        {
+            MainSnackbar.MessageQueue?.Enqueue(message);
+        }
+
+        private void DeleteOldLogs()
+        {
+            try
+            {
+                if (File.Exists(LogFilePath))
+                {
+                    var lines = File.ReadAllLines(LogFilePath);
+                    var fresh = Array.FindAll(lines, line =>
+                    {
+                        if (DateTime.TryParse(line.Substring(0, 19), out DateTime dt))
+                            return dt >= DateTime.Now.AddDays(-30);
+                        return true;
+                    });
+                    File.WriteAllLines(LogFilePath, fresh);
+                }
+            }
+            catch
+            {
+                // необязательно логировать
+            }
+        }
         private async void UpdateButton_Click(object sender, RoutedEventArgs e)
         {
             try
             {
-                UpdateButton.IsEnabled = false;
-                SettingsButton.IsEnabled = false;
+                SetControlsEnabled(false);
                 StatusText.Text = "Запуск обновления...";
-                ProgressBar.Value = 0;
+                UpdateProgress(0);
                 Log("Запуск обновления...");
 
-                string networkPath = NetworkPath;
-                string archiveName = ArchiveName;
-                string dvdPath = FindCDROMPath(archiveName);
+                if (!CheckNetworkPaths())
+                {
+                    ShowMessage("Сетевые пути недоступны.");
+                    StatusText.Text = "Ошибка подключения.";
+                    return;
+                }
+
+                string archiveName = _config["Settings"]["ArchiveName"];
+                string dvdPath = _config["Settings"]["UseCustomSource"] == "true"
+                                 ? FindCustomSourcePath(_config["Settings"]["CustomSourcePath"], archiveName)
+                                 : FindCDROMPath(archiveName);
 
                 if (dvdPath == null)
                 {
-                    StatusText.Text = "CD-ROM или архив не найдены!";
-                    Log("Ошибка: CD-ROM или архив не найдены!");
+                    ShowMessage("Архив не найден.");
+                    StatusText.Text = "Источник не найден!";
                     return;
                 }
 
-                if (!Directory.Exists(networkPath))
-                {
-                    StatusText.Text = "Сетевая папка не найдена!";
-                    Log("Ошибка: Сетевая папка не найдена!");
-                    return;
-                }
-
-                var result = MessageBox.Show("Вы уверены, что хотите очистить сетевую папку?",
-                    "Подтверждение", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                var result = MessageBox.Show("Очистить сетевую папку?", "Подтверждение",
+                    MessageBoxButton.YesNo, MessageBoxImage.Question);
                 if (result != MessageBoxResult.Yes)
                 {
-                    StatusText.Text = "Очистка отменена.";
-                    Log("Очистка сетевой папки отменена пользователем.");
+                    ShowMessage("Очистка отменена.");
                     return;
                 }
 
-                StatusText.Text = "Очистка сетевой папки...";
-                await Task.Run(() => CleanDirectory(networkPath));
-                ProgressBar.Value = 25;
-                Log("Сетевая папка очищена.");
+                await ProcessPath(_config["Settings"]["NetworkPath"], dvdPath, archiveName, 0);
 
-                string destinationArchive = Path.Combine(networkPath, archiveName);
-                StatusText.Text = "Копирование архива...";
-                await Task.Run(() => File.Copy(dvdPath, destinationArchive, true));
-                ProgressBar.Value = 50;
-                Log("Архив скопирован.");
-
-                StatusText.Text = "Проверка архива...";
-                if (!await Task.Run(() => CheckArchiveIntegrity(destinationArchive)))
+                if (_config["Settings"]["UseSecondaryPath"] == "true")
                 {
-                    StatusText.Text = "Архив повреждён!";
-                    Log("Ошибка: Архив повреждён!");
-                    return;
+                    await ProcessPath(_config["Settings"]["SecondaryNetworkPath"], dvdPath, archiveName, 50);
                 }
-                Log("Проверка архива прошла успешно.");
 
-                StatusText.Text = "Распаковка архива...";
-                await Task.Run(() => ZipFile.ExtractToDirectory(destinationArchive, networkPath));
-                ProgressBar.Value = 75;
-                Log("Архив распакован.");
-
-                StatusText.Text = "Удаление архива...";
-                await Task.Run(() => File.Delete(destinationArchive));
-                ProgressBar.Value = 100;
-                Log("Архив удалён.");
-
-                StatusText.Text = "Обновление успешно завершено!";
-                Log("Обновление успешно завершено!");
-            }
-            catch (UnauthorizedAccessException)
-            {
-                StatusText.Text = "Нет доступа к сетевой папке или CD-ROM.";
-                Log("Ошибка: Нет доступа к сетевой папке или CD-ROM.");
+                StatusText.Text = "Обновление завершено!";
+                ShowMessage("Успешно завершено.");
+                Log("Обновление завершено.");
             }
             catch (Exception ex)
             {
-                StatusText.Text = $"Ошибка: {ex.Message}";
-                Log($"Ошибка: {ex.Message}");
+                ShowMessage("Ошибка: " + ex.Message);
+                StatusText.Text = "Ошибка при обновлении.";
+                Log("Ошибка: " + ex.Message);
             }
             finally
             {
-                UpdateButton.IsEnabled = true;
-                SettingsButton.IsEnabled = true;
+                SetControlsEnabled(true);
             }
         }
 
-        private void SettingsButton_Click(object sender, RoutedEventArgs e)
+        private async Task ProcessPath(string path, string sourcePath, string archiveName, int progressOffset)
         {
-            var settingsWindow = new SettingsWindow(NetworkPath, ArchiveName);
-            if (settingsWindow.ShowDialog() == true)
+            if (!Directory.Exists(path))
             {
-                var parser = new FileIniDataParser();
-                _config["Settings"]["NetworkPath"] = settingsWindow.NetworkPath;
-                _config["Settings"]["ArchiveName"] = settingsWindow.ArchiveName;
-                parser.WriteFile(ConfigFilePath, _config);
-                Log("Настройки обновлены.");
-                StatusText.Text = "Настройки сохранены.";
+                ShowMessage($"Путь {path} не найден.");
+                Log($"Ошибка: Путь {path} не найден.");
+                return;
+            }
+
+            StatusText.Text = $"Очистка {path}...";
+            await Task.Run(() => CleanDirectory(path));
+            UpdateProgress(progressOffset + 10);
+            Log($"Очищена папка {path}");
+
+            string archiveDest = Path.Combine(path, Path.GetFileName(sourcePath));
+            StatusText.Text = $"Копирование архива...";
+            await Task.Run(() => File.Copy(sourcePath, archiveDest, true));
+            UpdateProgress(progressOffset + 40);
+            Log($"Архив скопирован в {path}");
+
+            StatusText.Text = $"Проверка архива...";
+            if (!await Task.Run(() => CheckArchiveIntegrity(archiveDest)))
+            {
+                ShowMessage("Архив повреждён!");
+                Log("Архив повреждён");
+                return;
+            }
+            UpdateProgress(progressOffset + 60);
+            Log("Архив проверен");
+
+            StatusText.Text = $"Распаковка...";
+            await Task.Run(() => ZipFile.ExtractToDirectory(archiveDest, path));
+            UpdateProgress(progressOffset + 90);
+            Log("Распаковано");
+
+            File.Delete(archiveDest);
+            UpdateProgress(progressOffset + 100);
+            Log("Архив удалён");
+        }
+
+        private bool CheckNetworkPaths()
+        {
+            try
+            {
+                string p1 = _config["Settings"]["NetworkPath"];
+                if (!Directory.Exists(p1)) return false;
+
+                if (_config["Settings"]["UseSecondaryPath"] == "true")
+                {
+                    string p2 = _config["Settings"]["SecondaryNetworkPath"];
+                    if (!Directory.Exists(p2)) return false;
+                }
+                return true;
+            }
+            catch
+            {
+                return false;
             }
         }
 
         private void CleanDirectory(string path)
         {
-            foreach (string file in Directory.GetFiles(path))
-            {
+            foreach (var file in Directory.GetFiles(path))
                 File.Delete(file);
-            }
-            foreach (string dir in Directory.GetDirectories(path))
-            {
+            foreach (var dir in Directory.GetDirectories(path))
                 Directory.Delete(dir, true);
-            }
         }
 
-        private string FindCDROMPath(string archiveName)
+        private string FindCDROMPath(string mask)
         {
-            foreach (DriveInfo drive in DriveInfo.GetDrives())
+            foreach (var drive in DriveInfo.GetDrives())
             {
                 if (drive.DriveType == DriveType.CDRom && drive.IsReady)
                 {
-                    string archivePath = Path.Combine(drive.RootDirectory.FullName, archiveName);
-                    if (File.Exists(archivePath))
-                    {
-                        return archivePath;
-                    }
+                    var files = Directory.GetFiles(drive.RootDirectory.FullName, mask);
+                    if (files.Length > 0) return files[0];
                 }
+            }
+            return null;
+        }
+
+        private string FindCustomSourcePath(string path, string mask)
+        {
+            if (Directory.Exists(path))
+            {
+                var files = Directory.GetFiles(path, mask);
+                if (files.Length > 0) return files[0];
             }
             return null;
         }
@@ -182,7 +305,7 @@ namespace AVUpdate
         {
             try
             {
-                using (ZipArchive archive = ZipFile.OpenRead(archivePath))
+                using (var archive = ZipFile.OpenRead(archivePath))
                 {
                     foreach (var entry in archive.Entries)
                     {
@@ -194,6 +317,41 @@ namespace AVUpdate
             catch
             {
                 return false;
+            }
+        }
+
+        private void SettingsButton_Click(object sender, RoutedEventArgs e)
+        {
+            var window = new SettingsWindow(
+                _config["Settings"]["NetworkPath"],
+                _config["Settings"]["ArchiveName"],
+                _config["Settings"]["UseSecondaryPath"] == "true",
+                _config["Settings"]["SecondaryNetworkPath"],
+                _config["Settings"]["SecondaryUsername"],
+                _config["Settings"]["SecondaryPassword"],
+                _config["Settings"]["UseCustomSource"] == "true",
+                _config["Settings"]["CustomSourcePath"],
+                _config["Settings"].ContainsKey("Theme") ? _config["Settings"]["Theme"] : "Dark")
+            {
+                Owner = this
+            };
+
+
+            if (window.ShowDialog() == true)
+            {
+                _config["Settings"]["NetworkPath"] = window.NetworkPath;
+                _config["Settings"]["ArchiveName"] = window.ArchiveName;
+                _config["Settings"]["UseSecondaryPath"] = window.UseSecondaryPath.ToString().ToLower();
+                _config["Settings"]["SecondaryNetworkPath"] = window.SecondaryNetworkPath;
+                _config["Settings"]["SecondaryUsername"] = window.SecondaryUsername;
+                _config["Settings"]["SecondaryPassword"] = window.SecondaryPassword;
+                _config["Settings"]["UseCustomSource"] = window.UseCustomSource.ToString().ToLower();
+                _config["Settings"]["CustomSourcePath"] = window.CustomSourcePath;
+                _config["Settings"]["Theme"] = window.SelectedTheme;
+
+                new FileIniDataParser().WriteFile(ConfigFilePath, _config);
+                ShowMessage("Настройки сохранены.");
+                Log("Настройки обновлены.");
             }
         }
 
