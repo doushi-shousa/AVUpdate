@@ -9,7 +9,6 @@
 
     <materialDesign:DialogHost>
         <Grid Margin="20">
-
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
@@ -66,20 +65,28 @@
                             Content="Обновить"
                             Width="140" Height="40" Margin="5"
                             Click="UpdateButton_Click"
-                            Style="{StaticResource MaterialDesignRaisedButton}" />
+                            Style="{DynamicResource MaterialDesignRaisedButton}" />
 
                     <Button x:Name="SettingsButton"
                             Content="Настройки"
                             Width="140" Height="40" Margin="5"
                             Click="SettingsButton_Click"
-                            Style="{StaticResource MaterialDesignFlatButton}" />
+                            Style="{DynamicResource MaterialDesignFlatButton}" />
 
                     <Button x:Name="ThemeButton"
                             Width="50" Height="40" Margin="5"
                             Click="ThemeButton_Click"
-                            Style="{StaticResource MaterialDesignFlatButton}">
+                            Style="{DynamicResource MaterialDesignFlatButton}">
                         <TextBlock x:Name="ThemeIcon" Text="🌙" FontSize="16" HorizontalAlignment="Center" />
                     </Button>
+
+                    <!-- Новая кнопка для отмены обновления -->
+                    <Button x:Name="CancelButton"
+                            Content="Отмена"
+                            Width="140" Height="40" Margin="5"
+                            Click="CancelButton_Click"
+                            Style="{DynamicResource MaterialDesignFlatButton}"
+                            IsEnabled="False"/>
                 </StackPanel>
 
                 <!-- Статус -->

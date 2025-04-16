@@ -8,51 +8,74 @@
         ResizeMode="NoResize"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource MaterialDesignPaper}">
-
     <Grid Margin="20">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <StackPanel Grid.Row="0" VerticalAlignment="Top" Margin="0,0,0,10" Cursor="">
-
+        <!-- Основной блок ввода настроек -->
+        <StackPanel Grid.Row="0" VerticalAlignment="Top" Margin="0,0,0,10">
+            <!-- Сетевой путь -->
             <TextBlock Text="Сетевой путь:" Foreground="{DynamicResource MaterialDesignBody}" />
-            <TextBox x:Name="NetworkPathTextBox" Style="{StaticResource MaterialDesignFloatingHintTextBox}" />
-            <Button Content="Выбрать" Click="SelectNetworkPathButton_Click"
-                    Style="{StaticResource MaterialDesignFlatButton}" Margin="0,5,0,10"/>
+            <TextBox x:Name="NetworkPathTextBox" 
+                     Style="{DynamicResource MaterialDesignFloatingHintTextBox}" 
+                     Margin="0,0,0,10"/>
+            <Button Content="Выбрать" 
+                    Click="SelectNetworkPathButton_Click"
+                    Style="{DynamicResource MaterialDesignFlatButton}" 
+                    Margin="0,5,0,10"/>
 
+            <!-- Имя архива (маска) -->
             <TextBlock Text="Имя архива (маска):" Foreground="{DynamicResource MaterialDesignBody}" />
-            <TextBox x:Name="ArchiveNameTextBox" Style="{StaticResource MaterialDesignFloatingHintTextBox}" Margin="0,0,0,10"/>
+            <TextBox x:Name="ArchiveNameTextBox" 
+                     Style="{DynamicResource MaterialDesignFloatingHintTextBox}" 
+                     Margin="0,0,0,10"/>
 
+            <!-- Использование дополнительного пути -->
             <CheckBox x:Name="UseSecondaryPathCheckBox"
                       Content="Использовать второй путь"
                       Margin="0,10,0,5"/>
 
+            <!-- Дополнительный путь -->
             <TextBlock Text="Доп. путь:" Foreground="{DynamicResource MaterialDesignBody}" />
-            <TextBox x:Name="SecondaryNetworkPathTextBox" Style="{StaticResource MaterialDesignFloatingHintTextBox}" />
-            <Button Content="Выбрать" Click="SelectSecondaryNetworkPathButton_Click"
-                    Style="{StaticResource MaterialDesignFlatButton}" Margin="0,5,0,10"/>
+            <TextBox x:Name="SecondaryNetworkPathTextBox" 
+                     Style="{DynamicResource MaterialDesignFloatingHintTextBox}" 
+                     Margin="0,0,0,10"/>
+            <Button Content="Выбрать" 
+                    Click="SelectSecondaryNetworkPathButton_Click"
+                    Style="{DynamicResource MaterialDesignFlatButton}" 
+                    Margin="0,5,0,10"/>
 
+            <!-- Аутентификация для дополнительного пути -->
             <TextBlock Text="Логин:" Foreground="{DynamicResource MaterialDesignBody}" />
-            <TextBox x:Name="SecondaryUsernameTextBox" Style="{StaticResource MaterialDesignFloatingHintTextBox}" />
-
+            <TextBox x:Name="SecondaryUsernameTextBox" 
+                     Style="{DynamicResource MaterialDesignFloatingHintTextBox}" 
+                     Margin="0,0,0,10"/>
             <TextBlock Text="Пароль:" Margin="0,10,0,0" Foreground="{DynamicResource MaterialDesignBody}" />
-            <PasswordBox x:Name="SecondaryPasswordBox" Margin="0,0,0,10"
-                         Style="{StaticResource MaterialDesignFloatingHintPasswordBox}" />
+            <PasswordBox x:Name="SecondaryPasswordBox" 
+                         Style="{DynamicResource MaterialDesignFloatingHintPasswordBox}" 
+                         Margin="0,0,0,10"/>
 
+            <!-- Использование пользовательского источника обновления -->
             <CheckBox x:Name="UseCustomSourceCheckBox"
                       Content="Путь к обновлению (не DVD)"
                       Margin="0,10,0,5"/>
 
+            <!-- Путь к обновлению -->
             <TextBlock Text="Путь к обновлению:" Foreground="{DynamicResource MaterialDesignBody}" />
-            <TextBox x:Name="CustomSourcePathTextBox" Style="{StaticResource MaterialDesignFloatingHintTextBox}" />
-            <Button Content="Выбрать" Click="SelectCustomSourcePathButton_Click"
-                    Style="{StaticResource MaterialDesignFlatButton}" Margin="0,5,0,10"/>
+            <TextBox x:Name="CustomSourcePathTextBox" 
+                     Style="{DynamicResource MaterialDesignFloatingHintTextBox}" 
+                     Margin="0,0,0,10"/>
+            <Button Content="Выбрать" 
+                    Click="SelectCustomSourcePathButton_Click"
+                    Style="{DynamicResource MaterialDesignFlatButton}" 
+                    Margin="0,5,0,10"/>
 
+            <!-- Выбор цветовой темы -->
             <TextBlock Text="Цветовая тема:" Foreground="{DynamicResource MaterialDesignBody}" Margin="0,10,0,5"/>
             <ComboBox x:Name="ThemeComboBox"
-                      Style="{StaticResource MaterialDesignComboBox}"
+                      Style="{DynamicResource MaterialDesignComboBox}"
                       Width="200">
                 <ComboBoxItem Content="Light"/>
                 <ComboBoxItem Content="Dark"/>
@@ -60,14 +83,15 @@
             </ComboBox>
         </StackPanel>
 
-        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right">
+        <!-- Блок управления: кнопки "Сохранить" и "Отмена" -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
             <Button Content="Сохранить" Width="100"
                     Click="SaveButton_Click"
-                    Style="{StaticResource MaterialDesignRaisedButton}"
+                    Style="{DynamicResource MaterialDesignRaisedButton}"
                     Margin="0,0,10,0"/>
             <Button Content="Отмена" Width="100"
                     IsCancel="True"
-                    Style="{StaticResource MaterialDesignFlatButton}"/>
+                    Style="{DynamicResource MaterialDesignFlatButton}"/>
         </StackPanel>
     </Grid>
 </Window>

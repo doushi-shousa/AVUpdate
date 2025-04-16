@@ -1,8 +1,8 @@
-﻿
-using System;
+﻿using System;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
-using Microsoft.Win32;
+using System.Windows.Forms;
 
 namespace AVUpdate
 {
@@ -54,6 +54,13 @@ namespace AVUpdate
 
         private void SaveButton_Click(object sender, RoutedEventArgs e)
         {
+            // Валидация: проверяем, что обязательное поле (NetworkPath) не пустое
+            if (string.IsNullOrWhiteSpace(NetworkPathTextBox.Text))
+            {
+                System.Windows.MessageBox.Show("Путь к сетевому ресурсу не может быть пустым.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
             NetworkPath = NetworkPathTextBox.Text;
             ArchiveName = ArchiveNameTextBox.Text;
             UseSecondaryPath = UseSecondaryPathCheckBox.IsChecked ?? false;
@@ -68,28 +75,55 @@ namespace AVUpdate
 
         private void SelectNetworkPathButton_Click(object sender, RoutedEventArgs e)
         {
-            var dialog = new System.Windows.Forms.FolderBrowserDialog();
-            if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+            try
             {
-                NetworkPathTextBox.Text = dialog.SelectedPath;
+                using (var dialog = new FolderBrowserDialog())
+                {
+                    if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                    {
+                        NetworkPathTextBox.Text = dialog.SelectedPath;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show("Ошибка при выборе каталога: " + ex.Message, "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
         private void SelectSecondaryNetworkPathButton_Click(object sender, RoutedEventArgs e)
         {
-            var dialog = new System.Windows.Forms.FolderBrowserDialog();
-            if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+            try
             {
-                SecondaryNetworkPathTextBox.Text = dialog.SelectedPath;
+                using (var dialog = new FolderBrowserDialog())
+                {
+                    if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                    {
+                        SecondaryNetworkPathTextBox.Text = dialog.SelectedPath;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show("Ошибка при выборе дополнительного каталога: " + ex.Message, "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
         private void SelectCustomSourcePathButton_Click(object sender, RoutedEventArgs e)
         {
-            var dialog = new System.Windows.Forms.FolderBrowserDialog();
-            if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+            try
             {
-                CustomSourcePathTextBox.Text = dialog.SelectedPath;
+                using (var dialog = new FolderBrowserDialog())
+                {
+                    if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                    {
+                        CustomSourcePathTextBox.Text = dialog.SelectedPath;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show("Ошибка при выборе пути обновления: " + ex.Message, "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
     }

@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
@@ -19,6 +20,7 @@ namespace AVUpdate
         private const string LogFilePath = "update.log";
         private bool isDarkTheme = false;
         private bool isUpdating = false;
+        private CancellationTokenSource updateCancellationTokenSource;
 
         public MainWindow()
         {
@@ -45,38 +47,87 @@ namespace AVUpdate
                 _config = parser.ReadFile(ConfigFilePath);
             }
 
+            // Устанавливаем тему согласно настройкам из INI-файла
             string theme = _config["Settings"]["Theme"];
-            ApplyTheme(theme);
+            UpdateAppTheme(theme);
             UpdateThemeIcon(theme);
 
             Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(UpdatePathStatusUI));
         }
 
-        private void UpdateThemeIcon(string theme)
+        /// <summary>
+        /// Меняет глобальные ресурсы приложения для обновления темы.
+        /// </summary>
+        /// <param name="theme">Название темы: Light, Dark или System.</param>
+        private void UpdateAppTheme(string theme)
         {
-            ThemeIcon.Text = theme == "Dark" ? "☀️" : "🌙";
-            isDarkTheme = theme == "Dark";
-        }
+            var dictionaries = Application.Current.Resources.MergedDictionaries;
+            dictionaries.Clear();
 
-        private void ApplyTheme(string theme)
-        {
-            var palette = new PaletteHelper();
-            ITheme current = palette.GetTheme();
-
-            switch (theme.ToLower())
+            // Добавляем базовый словарь стилей Material Design
+            dictionaries.Add(new ResourceDictionary
             {
-                case "light": current.SetBaseTheme(Theme.Light); break;
-                case "dark": current.SetBaseTheme(Theme.Dark); break;
-                default: current.SetBaseTheme(Theme.Dark); break;
+                Source = new Uri("pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesignTheme.Defaults.xaml")
+            });
+
+            // Выбираем тему по значению параметра
+            if (theme.Equals("Light", StringComparison.OrdinalIgnoreCase))
+            {
+                dictionaries.Add(new ResourceDictionary
+                {
+                    Source = new Uri("pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesignTheme.Light.xaml")
+                });
+            }
+            else if (theme.Equals("Dark", StringComparison.OrdinalIgnoreCase))
+            {
+                dictionaries.Add(new ResourceDictionary
+                {
+                    Source = new Uri("pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesignTheme.Dark.xaml")
+                });
+            }
+            else if (theme.Equals("System", StringComparison.OrdinalIgnoreCase))
+            {
+                // Пример простой реализации: по умолчанию выбираем Dark
+                dictionaries.Add(new ResourceDictionary
+                {
+                    Source = new Uri("pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesignTheme.Dark.xaml")
+                });
+            }
+            else
+            {
+                dictionaries.Add(new ResourceDictionary
+                {
+                    Source = new Uri("pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesignTheme.Dark.xaml")
+                });
             }
 
-            palette.SetTheme(current);
+            // Добавляем словари цветов
+            dictionaries.Add(new ResourceDictionary
+            {
+                Source = new Uri("pack://application:,,,/MaterialDesignColors;component/Themes/Recommended/Primary/MaterialDesignColor.DeepPurple.xaml")
+            });
+            dictionaries.Add(new ResourceDictionary
+            {
+                Source = new Uri("pack://application:,,,/MaterialDesignColors;component/Themes/Recommended/Accent/MaterialDesignColor.Lime.xaml")
+            });
+        }
+
+        /// <summary>
+        /// Обновляет значок кнопки переключения темы.
+        /// </summary>
+        /// <param name="theme">Название темы.</param>
+        private void UpdateThemeIcon(string theme)
+        {
+            // Если тема Dark, значит значок показывает "☀️" для переключения на Light, иначе – "🌙"
+            ThemeIcon.Text = theme.Equals("Dark", StringComparison.OrdinalIgnoreCase) ? "☀️" : "🌙";
+            isDarkTheme = theme.Equals("Dark", StringComparison.OrdinalIgnoreCase);
         }
 
         private void ThemeButton_Click(object sender, RoutedEventArgs e)
         {
+            // Переключаем тему: если сейчас темная – выбираем светлую, иначе – темную.
             string newTheme = isDarkTheme ? "Light" : "Dark";
-            ApplyTheme(newTheme);
+            UpdateAppTheme(newTheme);
             UpdateThemeIcon(newTheme);
             _config["Settings"]["Theme"] = newTheme;
             new FileIniDataParser().WriteFile(ConfigFilePath, _config);
@@ -102,11 +153,9 @@ namespace AVUpdate
 
         private void UpdatePathStatusUI()
         {
-            // Главный путь
             bool primaryExists = Directory.Exists(_config["Settings"]["NetworkPath"]);
             PrimaryStatus.Fill = primaryExists ? Brushes.LightGreen : Brushes.IndianRed;
 
-            // Второй путь
             bool showSecondary = _config["Settings"]["UseSecondaryPath"] == "true";
             bool secondaryExists = Directory.Exists(_config["Settings"]["SecondaryNetworkPath"]);
 
@@ -144,7 +193,7 @@ namespace AVUpdate
 
                 new FileIniDataParser().WriteFile(ConfigFilePath, _config);
 
-                ApplyTheme(window.SelectedTheme);
+                UpdateAppTheme(window.SelectedTheme);
                 UpdateThemeIcon(window.SelectedTheme);
                 UpdatePathStatusUI();
 
@@ -156,6 +205,8 @@ namespace AVUpdate
         {
             isUpdating = true;
             SetControlsEnabled(false);
+            CancelButton.IsEnabled = true;
+            updateCancellationTokenSource = new CancellationTokenSource();
 
             string archiveMask = _config["Settings"]["ArchiveName"];
             string archivePath = _config["Settings"]["UseCustomSource"] == "true"
@@ -167,6 +218,7 @@ namespace AVUpdate
                 ShowMessage("Архив не найден.");
                 StatusText.Text = "Архив не найден.";
                 SetControlsEnabled(true);
+                CancelButton.IsEnabled = false;
                 isUpdating = false;
                 return;
             }
@@ -175,35 +227,66 @@ namespace AVUpdate
             ArchivePathText.Text = $"Архив: {Path.GetFileName(archivePath)}";
             TargetPathText.Text = $"Путь: {destPath}";
 
-            StatusText.Text = "Очистка каталога...";
-            await Task.Run(() => CleanDirectory(destPath));
-            UpdateProgress(15);
+            try
+            {
+                StatusText.Text = "Очистка каталога...";
+                await Task.Run(() => CleanDirectory(destPath, updateCancellationTokenSource.Token), updateCancellationTokenSource.Token);
+                UpdateProgress(15);
 
-            StatusText.Text = "Копирование...";
-            string targetZip = Path.Combine(destPath, Path.GetFileName(archivePath));
-            await Task.Run(() => File.Copy(archivePath, targetZip, true));
-            UpdateProgress(50);
+                StatusText.Text = "Копирование...";
+                string targetZip = Path.Combine(destPath, Path.GetFileName(archivePath));
+                await Task.Run(() => File.Copy(archivePath, targetZip, true), updateCancellationTokenSource.Token);
+                UpdateProgress(50);
 
-            StatusText.Text = "Распаковка...";
-            await Task.Run(() => ZipFile.ExtractToDirectory(targetZip, destPath));
-            UpdateProgress(90);
+                StatusText.Text = "Распаковка...";
+                await Task.Run(() => ZipFile.ExtractToDirectory(targetZip, destPath), updateCancellationTokenSource.Token);
+                UpdateProgress(90);
 
-            File.Delete(targetZip);
-            UpdateProgress(100);
-            StatusText.Text = "Готово";
-            ShowMessage("Обновление завершено.");
-            SetControlsEnabled(true);
-            isUpdating = false;
+                File.Delete(targetZip);
+                UpdateProgress(100);
+                StatusText.Text = "Готово";
+                ShowMessage("Обновление завершено.");
+            }
+            catch (OperationCanceledException)
+            {
+                ShowMessage("Обновление отменено.");
+                StatusText.Text = "Обновление отменено.";
+            }
+            catch (Exception ex)
+            {
+                ShowMessage("Ошибка обновления: " + ex.Message);
+                StatusText.Text = "Ошибка обновления.";
+                LogError(ex);
+            }
+            finally
+            {
+                isUpdating = false;
+                SetControlsEnabled(true);
+                CancelButton.IsEnabled = false;
+                updateCancellationTokenSource.Dispose();
+                updateCancellationTokenSource = null;
+            }
         }
 
-        private void CleanDirectory(string path)
+        private void CancelButton_Click(object sender, RoutedEventArgs e)
+        {
+            updateCancellationTokenSource?.Cancel();
+        }
+
+        private void CleanDirectory(string path, CancellationToken token)
         {
             if (!Directory.Exists(path)) return;
 
             foreach (var f in Directory.GetFiles(path))
+            {
+                token.ThrowIfCancellationRequested();
                 File.Delete(f);
+            }
             foreach (var d in Directory.GetDirectories(path))
+            {
+                token.ThrowIfCancellationRequested();
                 Directory.Delete(d, true);
+            }
         }
 
         private string FindCDROMPath(string archiveMask)
@@ -233,12 +316,21 @@ namespace AVUpdate
             ThemeButton.IsEnabled = enabled;
         }
 
+        private void LogError(Exception ex)
+        {
+            try
+            {
+                File.AppendAllText(LogFilePath, DateTime.Now + " - " + ex.ToString() + Environment.NewLine);
+            }
+            catch { }
+        }
+
         protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
         {
             if (isUpdating)
             {
                 e.Cancel = true;
-                ShowMessage("Дождитесь завершения обновления перед выходом.");
+                ShowMessage("Дождитесь завершения обновления или отмените его перед выходом.");
             }
             base.OnClosing(e);
         }
