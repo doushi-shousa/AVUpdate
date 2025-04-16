@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using IniParser;
 using IniParser.Model;
@@ -37,8 +38,8 @@ namespace AVUpdate
                 _config["Settings"]["ArchiveName"] = "update*.zip";
                 _config["Settings"]["UseSecondaryPath"] = "false";
                 _config["Settings"]["SecondaryNetworkPath"] = @"\\x.x.x.x\c$\source";
-                _config["Settings"]["SecondaryUsername"] = ""; // задайте учетные данные
-                _config["Settings"]["SecondaryPassword"] = ""; // задайте учетные данные
+                _config["Settings"]["SecondaryUsername"] = ""; // укажите логин, если нужен
+                _config["Settings"]["SecondaryPassword"] = ""; // укажите пароль, если нужен
                 _config["Settings"]["UseCustomSource"] = "false";
                 _config["Settings"]["CustomSourcePath"] = "";
                 _config["Settings"]["Theme"] = "Dark";
@@ -49,6 +50,7 @@ namespace AVUpdate
                 _config = parser.ReadFile(ConfigFilePath);
             }
 
+            // Устанавливаем тему согласно настройкам
             string theme = _config["Settings"]["Theme"];
             UpdateAppTheme(theme);
             UpdateThemeIcon(theme);
@@ -56,12 +58,36 @@ namespace AVUpdate
             Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(UpdatePathStatusUI));
         }
 
+        /// <summary>
+        /// Метод плавно меняет тему с анимацией прозрачности.
+        /// </summary>
+        private async Task UpdateThemeWithAnimation(string newTheme)
+        {
+            // Плавное затухание (300 мс)
+            var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(300));
+            this.BeginAnimation(OpacityProperty, fadeOut);
+            await Task.Delay(300);
+
+            // Обновление глобальных ресурсов темы
+            UpdateAppTheme(newTheme);
+            UpdateThemeIcon(newTheme);
+            _config["Settings"]["Theme"] = newTheme;
+            new FileIniDataParser().WriteFile(ConfigFilePath, _config);
+
+            // Плавное появление (300 мс)
+            var fadeIn = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(300));
+            this.BeginAnimation(OpacityProperty, fadeIn);
+        }
+
+        /// <summary>
+        /// Обновляет глобальные словари ресурсов в зависимости от выбранной темы.
+        /// </summary>
         private void UpdateAppTheme(string theme)
         {
             var dictionaries = Application.Current.Resources.MergedDictionaries;
             dictionaries.Clear();
 
-            // Базовый словарь стилей
+            // Базовый словарь стилей Material Design
             dictionaries.Add(new ResourceDictionary
             {
                 Source = new Uri("pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesignTheme.Defaults.xaml")
@@ -74,9 +100,16 @@ namespace AVUpdate
                     Source = new Uri("pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesignTheme.Light.xaml")
                 });
             }
-            else if (theme.Equals("Dark", StringComparison.OrdinalIgnoreCase) ||
-                     theme.Equals("System", StringComparison.OrdinalIgnoreCase))
+            else if (theme.Equals("Dark", StringComparison.OrdinalIgnoreCase))
             {
+                dictionaries.Add(new ResourceDictionary
+                {
+                    Source = new Uri("pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesignTheme.Dark.xaml")
+                });
+            }
+            else if (theme.Equals("System", StringComparison.OrdinalIgnoreCase))
+            {
+                // В качестве примера выбираем Dark
                 dictionaries.Add(new ResourceDictionary
                 {
                     Source = new Uri("pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesignTheme.Dark.xaml")
@@ -90,6 +123,7 @@ namespace AVUpdate
                 });
             }
 
+            // Добавляем словари цветов
             dictionaries.Add(new ResourceDictionary
             {
                 Source = new Uri("pack://application:,,,/MaterialDesignColors;component/Themes/Recommended/Primary/MaterialDesignColor.DeepPurple.xaml")
@@ -102,18 +136,15 @@ namespace AVUpdate
 
         private void UpdateThemeIcon(string theme)
         {
-            // Если текущая тема "Dark", то значок переключения показывает "☀️" (для смены на Light)
+            // Если текущая тема "Dark", то значок показывает "☀️" (для смены на Light)
             ThemeIcon.Text = theme.Equals("Dark", StringComparison.OrdinalIgnoreCase) ? "☀️" : "🌙";
             isDarkTheme = theme.Equals("Dark", StringComparison.OrdinalIgnoreCase);
         }
 
-        private void ThemeButton_Click(object sender, RoutedEventArgs e)
+        private async void ThemeButton_Click(object sender, RoutedEventArgs e)
         {
             string newTheme = isDarkTheme ? "Light" : "Dark";
-            UpdateAppTheme(newTheme);
-            UpdateThemeIcon(newTheme);
-            _config["Settings"]["Theme"] = newTheme;
-            new FileIniDataParser().WriteFile(ConfigFilePath, _config);
+            await UpdateThemeWithAnimation(newTheme);
         }
 
         private void ShowMessage(string message)
@@ -140,14 +171,13 @@ namespace AVUpdate
             bool primaryExists = Directory.Exists(_config["Settings"]["NetworkPath"]);
             PrimaryStatus.Fill = primaryExists ? Brushes.LightGreen : Brushes.IndianRed;
 
-            // Проверка второго пути (возможно, административное скрытое)
+            // Проверка второго пути (с учетом возможного подключения по учетным данным)
             bool showSecondary = _config["Settings"]["UseSecondaryPath"] == "true";
             bool secondaryExists = false;
             if (showSecondary)
             {
                 try
                 {
-                    // Если заданы учетные данные, пытаемся подключиться через NetworkConnection
                     if (!string.IsNullOrWhiteSpace(_config["Settings"]["SecondaryUsername"]) &&
                         !string.IsNullOrWhiteSpace(_config["Settings"]["SecondaryPassword"]))
                     {
