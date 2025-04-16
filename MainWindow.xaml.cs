@@ -1,7 +1,9 @@
 ﻿using System;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -34,9 +36,9 @@ namespace AVUpdate
                 _config["Settings"]["NetworkPath"] = @"\\network\updates";
                 _config["Settings"]["ArchiveName"] = "update*.zip";
                 _config["Settings"]["UseSecondaryPath"] = "false";
-                _config["Settings"]["SecondaryNetworkPath"] = @"\\backup\updates";
-                _config["Settings"]["SecondaryUsername"] = "";
-                _config["Settings"]["SecondaryPassword"] = "";
+                _config["Settings"]["SecondaryNetworkPath"] = @"\\x.x.x.x\c$\source";
+                _config["Settings"]["SecondaryUsername"] = ""; // задайте учетные данные
+                _config["Settings"]["SecondaryPassword"] = ""; // задайте учетные данные
                 _config["Settings"]["UseCustomSource"] = "false";
                 _config["Settings"]["CustomSourcePath"] = "";
                 _config["Settings"]["Theme"] = "Dark";
@@ -47,7 +49,6 @@ namespace AVUpdate
                 _config = parser.ReadFile(ConfigFilePath);
             }
 
-            // Устанавливаем тему согласно настройкам из INI-файла
             string theme = _config["Settings"]["Theme"];
             UpdateAppTheme(theme);
             UpdateThemeIcon(theme);
@@ -55,22 +56,17 @@ namespace AVUpdate
             Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(UpdatePathStatusUI));
         }
 
-        /// <summary>
-        /// Меняет глобальные ресурсы приложения для обновления темы.
-        /// </summary>
-        /// <param name="theme">Название темы: Light, Dark или System.</param>
         private void UpdateAppTheme(string theme)
         {
             var dictionaries = Application.Current.Resources.MergedDictionaries;
             dictionaries.Clear();
 
-            // Добавляем базовый словарь стилей Material Design
+            // Базовый словарь стилей
             dictionaries.Add(new ResourceDictionary
             {
                 Source = new Uri("pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesignTheme.Defaults.xaml")
             });
 
-            // Выбираем тему по значению параметра
             if (theme.Equals("Light", StringComparison.OrdinalIgnoreCase))
             {
                 dictionaries.Add(new ResourceDictionary
@@ -78,16 +74,9 @@ namespace AVUpdate
                     Source = new Uri("pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesignTheme.Light.xaml")
                 });
             }
-            else if (theme.Equals("Dark", StringComparison.OrdinalIgnoreCase))
+            else if (theme.Equals("Dark", StringComparison.OrdinalIgnoreCase) ||
+                     theme.Equals("System", StringComparison.OrdinalIgnoreCase))
             {
-                dictionaries.Add(new ResourceDictionary
-                {
-                    Source = new Uri("pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesignTheme.Dark.xaml")
-                });
-            }
-            else if (theme.Equals("System", StringComparison.OrdinalIgnoreCase))
-            {
-                // Пример простой реализации: по умолчанию выбираем Dark
                 dictionaries.Add(new ResourceDictionary
                 {
                     Source = new Uri("pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesignTheme.Dark.xaml")
@@ -101,7 +90,6 @@ namespace AVUpdate
                 });
             }
 
-            // Добавляем словари цветов
             dictionaries.Add(new ResourceDictionary
             {
                 Source = new Uri("pack://application:,,,/MaterialDesignColors;component/Themes/Recommended/Primary/MaterialDesignColor.DeepPurple.xaml")
@@ -112,20 +100,15 @@ namespace AVUpdate
             });
         }
 
-        /// <summary>
-        /// Обновляет значок кнопки переключения темы.
-        /// </summary>
-        /// <param name="theme">Название темы.</param>
         private void UpdateThemeIcon(string theme)
         {
-            // Если тема Dark, значит значок показывает "☀️" для переключения на Light, иначе – "🌙"
+            // Если текущая тема "Dark", то значок переключения показывает "☀️" (для смены на Light)
             ThemeIcon.Text = theme.Equals("Dark", StringComparison.OrdinalIgnoreCase) ? "☀️" : "🌙";
             isDarkTheme = theme.Equals("Dark", StringComparison.OrdinalIgnoreCase);
         }
 
         private void ThemeButton_Click(object sender, RoutedEventArgs e)
         {
-            // Переключаем тему: если сейчас темная – выбираем светлую, иначе – темную.
             string newTheme = isDarkTheme ? "Light" : "Dark";
             UpdateAppTheme(newTheme);
             UpdateThemeIcon(newTheme);
@@ -153,12 +136,41 @@ namespace AVUpdate
 
         private void UpdatePathStatusUI()
         {
+            // Проверка основного пути
             bool primaryExists = Directory.Exists(_config["Settings"]["NetworkPath"]);
             PrimaryStatus.Fill = primaryExists ? Brushes.LightGreen : Brushes.IndianRed;
 
+            // Проверка второго пути (возможно, административное скрытое)
             bool showSecondary = _config["Settings"]["UseSecondaryPath"] == "true";
-            bool secondaryExists = Directory.Exists(_config["Settings"]["SecondaryNetworkPath"]);
-
+            bool secondaryExists = false;
+            if (showSecondary)
+            {
+                try
+                {
+                    // Если заданы учетные данные, пытаемся подключиться через NetworkConnection
+                    if (!string.IsNullOrWhiteSpace(_config["Settings"]["SecondaryUsername"]) &&
+                        !string.IsNullOrWhiteSpace(_config["Settings"]["SecondaryPassword"]))
+                    {
+                        using (var connection = new NetworkConnection(
+                            _config["Settings"]["SecondaryNetworkPath"],
+                            new NetworkCredential(
+                                _config["Settings"]["SecondaryUsername"],
+                                _config["Settings"]["SecondaryPassword"])))
+                        {
+                            secondaryExists = Directory.Exists(_config["Settings"]["SecondaryNetworkPath"]);
+                        }
+                    }
+                    else
+                    {
+                        secondaryExists = Directory.Exists(_config["Settings"]["SecondaryNetworkPath"]);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LogError(ex);
+                    secondaryExists = false;
+                }
+            }
             SecondaryStatus.Fill = secondaryExists ? Brushes.LightGreen : Brushes.IndianRed;
             SecondaryStatusPanel.Visibility = showSecondary ? Visibility.Visible : Visibility.Collapsed;
         }
