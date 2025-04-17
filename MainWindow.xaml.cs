@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Net;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -38,8 +39,8 @@ namespace AVUpdate
                 _config["Settings"]["ArchiveName"] = "update*.zip";
                 _config["Settings"]["UseSecondaryPath"] = "false";
                 _config["Settings"]["SecondaryNetworkPath"] = @"\\x.x.x.x\c$\source";
-                _config["Settings"]["SecondaryUsername"] = ""; // укажите логин, если нужен
-                _config["Settings"]["SecondaryPassword"] = ""; // укажите пароль, если нужен
+                _config["Settings"]["SecondaryUsername"] = "";
+                _config["Settings"]["SecondaryPassword"] = "";
                 _config["Settings"]["UseCustomSource"] = "false";
                 _config["Settings"]["CustomSourcePath"] = "";
                 _config["Settings"]["Theme"] = "Dark";
@@ -50,85 +51,47 @@ namespace AVUpdate
                 _config = parser.ReadFile(ConfigFilePath);
             }
 
-            // Устанавливаем тему согласно настройкам
+            // Инициализация темы и статуса путей
             string theme = _config["Settings"]["Theme"];
             UpdateAppTheme(theme);
             UpdateThemeIcon(theme);
-
             Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(UpdatePathStatusUI));
         }
 
-        /// <summary>
-        /// Метод плавно меняет тему с анимацией прозрачности.
-        /// </summary>
         private async Task UpdateThemeWithAnimation(string newTheme)
         {
-            // Плавное затухание (300 мс)
             var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(300));
             this.BeginAnimation(OpacityProperty, fadeOut);
             await Task.Delay(300);
 
-            // Обновление глобальных ресурсов темы
             UpdateAppTheme(newTheme);
             UpdateThemeIcon(newTheme);
             _config["Settings"]["Theme"] = newTheme;
             new FileIniDataParser().WriteFile(ConfigFilePath, _config);
 
-            // Плавное появление (300 мс)
             var fadeIn = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(300));
             this.BeginAnimation(OpacityProperty, fadeIn);
         }
 
-        /// <summary>
-        /// Обновляет глобальные словари ресурсов в зависимости от выбранной темы.
-        /// </summary>
         private void UpdateAppTheme(string theme)
         {
-            var dictionaries = Application.Current.Resources.MergedDictionaries;
-            dictionaries.Clear();
-
-            // Базовый словарь стилей Material Design
-            dictionaries.Add(new ResourceDictionary
+            var dicts = Application.Current.Resources.MergedDictionaries;
+            dicts.Clear();
+            dicts.Add(new ResourceDictionary
             {
                 Source = new Uri("pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesignTheme.Defaults.xaml")
             });
-
-            if (theme.Equals("Light", StringComparison.OrdinalIgnoreCase))
+            dicts.Add(new ResourceDictionary
             {
-                dictionaries.Add(new ResourceDictionary
-                {
-                    Source = new Uri("pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesignTheme.Light.xaml")
-                });
-            }
-            else if (theme.Equals("Dark", StringComparison.OrdinalIgnoreCase))
-            {
-                dictionaries.Add(new ResourceDictionary
-                {
-                    Source = new Uri("pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesignTheme.Dark.xaml")
-                });
-            }
-            else if (theme.Equals("System", StringComparison.OrdinalIgnoreCase))
-            {
-                // В качестве примера выбираем Dark
-                dictionaries.Add(new ResourceDictionary
-                {
-                    Source = new Uri("pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesignTheme.Dark.xaml")
-                });
-            }
-            else
-            {
-                dictionaries.Add(new ResourceDictionary
-                {
-                    Source = new Uri("pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesignTheme.Dark.xaml")
-                });
-            }
-
-            // Добавляем словари цветов
-            dictionaries.Add(new ResourceDictionary
+                Source = theme.Equals("Light", StringComparison.OrdinalIgnoreCase)
+                    ? new Uri("pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesignTheme.Light.xaml")
+                    : new Uri("pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesignTheme.Dark.xaml")
+            });
+            dicts.Add(new ResourceDictionary
             {
                 Source = new Uri("pack://application:,,,/MaterialDesignColors;component/Themes/Recommended/Primary/MaterialDesignColor.DeepPurple.xaml")
             });
-            dictionaries.Add(new ResourceDictionary
+            dicts.Add(new ResourceDictionary
             {
                 Source = new Uri("pack://application:,,,/MaterialDesignColors;component/Themes/Recommended/Accent/MaterialDesignColor.Lime.xaml")
             });
@@ -136,73 +99,22 @@ namespace AVUpdate
 
         private void UpdateThemeIcon(string theme)
         {
-            // Если текущая тема "Dark", то значок показывает "☀️" (для смены на Light)
-            ThemeIcon.Text = theme.Equals("Dark", StringComparison.OrdinalIgnoreCase) ? "☀️" : "🌙";
-            isDarkTheme = theme.Equals("Dark", StringComparison.OrdinalIgnoreCase);
+            if (theme.Equals("Dark", StringComparison.OrdinalIgnoreCase))
+            {
+                ThemeIcon.Kind = PackIconKind.WeatherSunny;
+                isDarkTheme = true;
+            }
+            else
+            {
+                ThemeIcon.Kind = PackIconKind.WeatherNight;
+                isDarkTheme = false;
+            }
         }
 
         private async void ThemeButton_Click(object sender, RoutedEventArgs e)
         {
             string newTheme = isDarkTheme ? "Light" : "Dark";
             await UpdateThemeWithAnimation(newTheme);
-        }
-
-        private void ShowMessage(string message)
-        {
-            MainSnackbar.MessageQueue?.Enqueue(message);
-        }
-
-        private void UpdateProgress(double percent)
-        {
-            ProgressBar.Value = percent;
-            ProgressPercent.Text = $"{(int)percent}%";
-
-            if (percent < 40)
-                ProgressBar.Foreground = new SolidColorBrush(Colors.OrangeRed);
-            else if (percent < 80)
-                ProgressBar.Foreground = new SolidColorBrush(Colors.Goldenrod);
-            else
-                ProgressBar.Foreground = new SolidColorBrush(Colors.LightGreen);
-        }
-
-        private void UpdatePathStatusUI()
-        {
-            // Проверка основного пути
-            bool primaryExists = Directory.Exists(_config["Settings"]["NetworkPath"]);
-            PrimaryStatus.Fill = primaryExists ? Brushes.LightGreen : Brushes.IndianRed;
-
-            // Проверка второго пути (с учетом возможного подключения по учетным данным)
-            bool showSecondary = _config["Settings"]["UseSecondaryPath"] == "true";
-            bool secondaryExists = false;
-            if (showSecondary)
-            {
-                try
-                {
-                    if (!string.IsNullOrWhiteSpace(_config["Settings"]["SecondaryUsername"]) &&
-                        !string.IsNullOrWhiteSpace(_config["Settings"]["SecondaryPassword"]))
-                    {
-                        using (var connection = new NetworkConnection(
-                            _config["Settings"]["SecondaryNetworkPath"],
-                            new NetworkCredential(
-                                _config["Settings"]["SecondaryUsername"],
-                                _config["Settings"]["SecondaryPassword"])))
-                        {
-                            secondaryExists = Directory.Exists(_config["Settings"]["SecondaryNetworkPath"]);
-                        }
-                    }
-                    else
-                    {
-                        secondaryExists = Directory.Exists(_config["Settings"]["SecondaryNetworkPath"]);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    LogError(ex);
-                    secondaryExists = false;
-                }
-            }
-            SecondaryStatus.Fill = secondaryExists ? Brushes.LightGreen : Brushes.IndianRed;
-            SecondaryStatusPanel.Visibility = showSecondary ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void SettingsButton_Click(object sender, RoutedEventArgs e)
@@ -217,9 +129,7 @@ namespace AVUpdate
                 _config["Settings"]["UseCustomSource"] == "true",
                 _config["Settings"]["CustomSourcePath"],
                 _config["Settings"].ContainsKey("Theme") ? _config["Settings"]["Theme"] : "Dark")
-            {
-                Owner = this
-            };
+            { Owner = this };
 
             if (window.ShowDialog() == true)
             {
@@ -232,13 +142,11 @@ namespace AVUpdate
                 _config["Settings"]["UseCustomSource"] = window.UseCustomSource.ToString().ToLower();
                 _config["Settings"]["CustomSourcePath"] = window.CustomSourcePath;
                 _config["Settings"]["Theme"] = window.SelectedTheme;
-
                 new FileIniDataParser().WriteFile(ConfigFilePath, _config);
 
                 UpdateAppTheme(window.SelectedTheme);
                 UpdateThemeIcon(window.SelectedTheme);
                 UpdatePathStatusUI();
-
                 ShowMessage("Настройки сохранены.");
             }
         }
@@ -250,12 +158,12 @@ namespace AVUpdate
             CancelButton.IsEnabled = true;
             updateCancellationTokenSource = new CancellationTokenSource();
 
-            string archiveMask = _config["Settings"]["ArchiveName"];
-            string archivePath = _config["Settings"]["UseCustomSource"] == "true"
-                ? FindCustomSourcePath(_config["Settings"]["CustomSourcePath"], archiveMask)
-                : FindCDROMPath(archiveMask);
+            string mask = _config["Settings"]["ArchiveName"];
+            string archive = _config["Settings"]["UseCustomSource"] == "true"
+                ? FindCustomSourcePath(_config["Settings"]["CustomSourcePath"], mask)
+                : FindCDROMPath(mask);
 
-            if (archivePath == null)
+            if (archive == null)
             {
                 ShowMessage("Архив не найден.");
                 StatusText.Text = "Архив не найден.";
@@ -265,26 +173,29 @@ namespace AVUpdate
                 return;
             }
 
-            string destPath = _config["Settings"]["NetworkPath"];
-            ArchivePathText.Text = $"Архив: {Path.GetFileName(archivePath)}";
-            TargetPathText.Text = $"Путь: {destPath}";
+            string dest = _config["Settings"]["NetworkPath"];
+            ArchivePathText.Text = $"Архив: {Path.GetFileName(archive)}";
+            TargetPathText.Text = $"Путь: {dest}";
 
             try
             {
                 StatusText.Text = "Очистка каталога...";
-                await Task.Run(() => CleanDirectory(destPath, updateCancellationTokenSource.Token), updateCancellationTokenSource.Token);
+                await Task.Run(() => CleanDirectory(dest, updateCancellationTokenSource.Token),
+                               updateCancellationTokenSource.Token);
                 UpdateProgress(15);
 
                 StatusText.Text = "Копирование...";
-                string targetZip = Path.Combine(destPath, Path.GetFileName(archivePath));
-                await Task.Run(() => File.Copy(archivePath, targetZip, true), updateCancellationTokenSource.Token);
+                string tempZip = Path.Combine(dest, Path.GetFileName(archive));
+                await Task.Run(() => File.Copy(archive, tempZip, true),
+                               updateCancellationTokenSource.Token);
                 UpdateProgress(50);
 
                 StatusText.Text = "Распаковка...";
-                await Task.Run(() => ZipFile.ExtractToDirectory(targetZip, destPath), updateCancellationTokenSource.Token);
+                await Task.Run(() => ZipFile.ExtractToDirectory(tempZip, dest),
+                               updateCancellationTokenSource.Token);
                 UpdateProgress(90);
 
-                File.Delete(targetZip);
+                File.Delete(tempZip);
                 UpdateProgress(100);
                 StatusText.Text = "Готово";
                 ShowMessage("Обновление завершено.");
@@ -311,14 +222,18 @@ namespace AVUpdate
         }
 
         private void CancelButton_Click(object sender, RoutedEventArgs e)
+            => updateCancellationTokenSource?.Cancel();
+
+        private void SetControlsEnabled(bool enabled)
         {
-            updateCancellationTokenSource?.Cancel();
+            UpdateButton.IsEnabled = enabled;
+            SettingsButton.IsEnabled = enabled;
+            ThemeButton.IsEnabled = enabled;
         }
 
         private void CleanDirectory(string path, CancellationToken token)
         {
             if (!Directory.Exists(path)) return;
-
             foreach (var f in Directory.GetFiles(path))
             {
                 token.ThrowIfCancellationRequested();
@@ -331,13 +246,13 @@ namespace AVUpdate
             }
         }
 
-        private string FindCDROMPath(string archiveMask)
+        private string FindCDROMPath(string mask)
         {
             foreach (var drive in DriveInfo.GetDrives())
             {
                 if (drive.DriveType == DriveType.CDRom && drive.IsReady)
                 {
-                    var files = Directory.GetFiles(drive.RootDirectory.FullName, archiveMask);
+                    var files = Directory.GetFiles(drive.RootDirectory.FullName, mask);
                     if (files.Length > 0) return files[0];
                 }
             }
@@ -351,23 +266,64 @@ namespace AVUpdate
             return files.Length > 0 ? files[0] : null;
         }
 
-        private void SetControlsEnabled(bool enabled)
+        private void UpdateProgress(double percent)
         {
-            UpdateButton.IsEnabled = enabled;
-            SettingsButton.IsEnabled = enabled;
-            ThemeButton.IsEnabled = enabled;
+            ProgressBar.Value = percent;
+            ProgressPercent.Text = $"{(int)percent}%";
+            if (percent < 40) ProgressBar.Foreground = new SolidColorBrush(Colors.OrangeRed);
+            else if (percent < 80) ProgressBar.Foreground = new SolidColorBrush(Colors.Goldenrod);
+            else ProgressBar.Foreground = new SolidColorBrush(Colors.LightGreen);
+        }
+
+        private void UpdatePathStatusUI()
+        {
+            // Проверка основного пути
+            bool primary = Directory.Exists(_config["Settings"]["NetworkPath"]);
+            PrimaryStatus.Fill = primary ? Brushes.LightGreen : Brushes.IndianRed;
+
+            // Проверка второго пути
+            bool showSecondary = _config["Settings"]["UseSecondaryPath"] == "true";
+            bool secondary = false;
+            if (showSecondary)
+            {
+                try
+                {
+                    if (!string.IsNullOrWhiteSpace(_config["Settings"]["SecondaryUsername"]) &&
+                        !string.IsNullOrWhiteSpace(_config["Settings"]["SecondaryPassword"]))
+                    {
+                        using (var conn = new NetworkConnection(
+                            _config["Settings"]["SecondaryNetworkPath"],
+                            new NetworkCredential(
+                                _config["Settings"]["SecondaryUsername"],
+                                _config["Settings"]["SecondaryPassword"])))
+                        {
+                            secondary = Directory.Exists(_config["Settings"]["SecondaryNetworkPath"]);
+                        }
+                    }
+                    else
+                    {
+                        secondary = Directory.Exists(_config["Settings"]["SecondaryNetworkPath"]);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LogError(ex);
+                }
+            }
+            SecondaryStatus.Fill = secondary ? Brushes.LightGreen : Brushes.IndianRed;
+            SecondaryStatusPanel.Visibility = showSecondary ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void LogError(Exception ex)
         {
             try
             {
-                File.AppendAllText(LogFilePath, DateTime.Now + " - " + ex.ToString() + Environment.NewLine);
+                File.AppendAllText(LogFilePath, $"{DateTime.Now} - {ex}\r\n");
             }
             catch { }
         }
 
-        protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+        protected override void OnClosing(CancelEventArgs e)
         {
             if (isUpdating)
             {
@@ -376,5 +332,8 @@ namespace AVUpdate
             }
             base.OnClosing(e);
         }
+
+        private void ShowMessage(string text)
+            => MainSnackbar.MessageQueue?.Enqueue(text);
     }
 }
