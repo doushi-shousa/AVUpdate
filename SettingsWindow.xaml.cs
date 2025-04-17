@@ -21,15 +21,22 @@ namespace AVUpdate
         {
             get
             {
-                if (ThemeComboBox.SelectedItem is ComboBoxItem selectedItem)
-                    return selectedItem.Content.ToString();
+                if (ThemeComboBox.SelectedItem is ComboBoxItem item)
+                    return item.Content.ToString();
                 return "Dark";
             }
         }
 
-        public SettingsWindow(string networkPath, string archiveName, bool useSecondaryPath,
-            string secondaryNetworkPath, string secondaryUsername, string secondaryPassword,
-            bool useCustomSource, string customSourcePath, string currentTheme)
+        public SettingsWindow(
+            string networkPath,
+            string archiveName,
+            bool useSecondaryPath,
+            string secondaryNetworkPath,
+            string secondaryUsername,
+            string secondaryPassword,
+            bool useCustomSource,
+            string customSourcePath,
+            string currentTheme)
         {
             InitializeComponent();
 
@@ -44,7 +51,7 @@ namespace AVUpdate
 
             foreach (ComboBoxItem item in ThemeComboBox.Items)
             {
-                if (item.Content.ToString().Equals(currentTheme, StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(item.Content.ToString(), currentTheme, StringComparison.OrdinalIgnoreCase))
                 {
                     ThemeComboBox.SelectedItem = item;
                     break;
@@ -54,10 +61,14 @@ namespace AVUpdate
 
         private void SaveButton_Click(object sender, RoutedEventArgs e)
         {
-            // Валидация: проверяем, что обязательное поле (NetworkPath) не пустое
             if (string.IsNullOrWhiteSpace(NetworkPathTextBox.Text))
             {
-                System.Windows.MessageBox.Show("Путь к сетевому ресурсу не может быть пустым.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                // Явно вызываем MessageBox из WPF, чтобы избежать System.Windows.Forms.MessageBox
+                System.Windows.MessageBox.Show(
+                    "Путь к сетевому ресурсу не может быть пустым.",
+                    "Ошибка",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
                 return;
             }
 
@@ -69,61 +80,40 @@ namespace AVUpdate
             SecondaryPassword = SecondaryPasswordBox.Password;
             UseCustomSource = UseCustomSourceCheckBox.IsChecked ?? false;
             CustomSourcePath = CustomSourcePathTextBox.Text;
+
             DialogResult = true;
             Close();
         }
 
         private void SelectNetworkPathButton_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                using (var dialog = new FolderBrowserDialog())
-                {
-                    if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
-                    {
-                        NetworkPathTextBox.Text = dialog.SelectedPath;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Windows.MessageBox.Show("Ошибка при выборе каталога: " + ex.Message, "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
+            => TrySelectFolder(path => NetworkPathTextBox.Text = path);
 
         private void SelectSecondaryNetworkPathButton_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                using (var dialog = new FolderBrowserDialog())
-                {
-                    if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
-                    {
-                        SecondaryNetworkPathTextBox.Text = dialog.SelectedPath;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Windows.MessageBox.Show("Ошибка при выборе дополнительного каталога: " + ex.Message, "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
+            => TrySelectFolder(path => SecondaryNetworkPathTextBox.Text = path);
 
         private void SelectCustomSourcePathButton_Click(object sender, RoutedEventArgs e)
+            => TrySelectFolder(path => CustomSourcePathTextBox.Text = path);
+
+        private void TrySelectFolder(Action<string> setPath)
         {
             try
             {
-                using (var dialog = new FolderBrowserDialog())
+                var dialog = new FolderBrowserDialog();
+                dialog.Description = "Выберите папку";
+                dialog.ShowNewFolderButton = true;
+                var result = dialog.ShowDialog();
+                if (result == System.Windows.Forms.DialogResult.OK)
                 {
-                    if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
-                    {
-                        CustomSourcePathTextBox.Text = dialog.SelectedPath;
-                    }
+                    setPath(dialog.SelectedPath);
                 }
             }
             catch (Exception ex)
             {
-                System.Windows.MessageBox.Show("Ошибка при выборе пути обновления: " + ex.Message, "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                System.Windows.MessageBox.Show(
+                    "Ошибка при выборе папки: " + ex.Message,
+                    "Ошибка",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
             }
         }
     }

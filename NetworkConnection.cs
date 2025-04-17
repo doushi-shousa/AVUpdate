@@ -5,9 +5,12 @@ using System.Runtime.InteropServices;
 
 namespace AVUpdate
 {
+    /// <summary>
+    /// Помогает подключаться к сетевым ресурсам с передачей учетных данных.
+    /// </summary>
     public class NetworkConnection : IDisposable
     {
-        private string _networkName;
+        private readonly string _networkName;
 
         public NetworkConnection(string networkName, NetworkCredential credentials)
         {
@@ -21,13 +24,12 @@ namespace AVUpdate
                 RemoteName = networkName
             };
 
-            // Формируем имя пользователя. Если нужен домен – укажите его в формате "DOMAIN\username".
-            string userName = credentials.UserName;
-            int result = WNetAddConnection2(netResource, credentials.Password, userName, 0);
-
+            // Если нужно указать домен, передавайте username как "DOMAIN\\user".
+            string username = credentials.UserName;
+            int result = WNetAddConnection2(netResource, credentials.Password, username, 0);
             if (result != 0)
             {
-                throw new Win32Exception(result, "Не удалось подключиться к сетевому ресурсу: " + networkName);
+                throw new Win32Exception(result, $"Не удалось подключиться к ресурсу {networkName}");
             }
         }
 
@@ -47,14 +49,14 @@ namespace AVUpdate
             WNetCancelConnection2(_networkName, 0, true);
         }
 
-        [DllImport("mpr.dll")]
+        [DllImport("mpr.dll", CharSet = CharSet.Unicode)]
         private static extern int WNetAddConnection2(NetResource netResource, string password, string username, int flags);
 
-        [DllImport("mpr.dll")]
+        [DllImport("mpr.dll", CharSet = CharSet.Unicode)]
         private static extern int WNetCancelConnection2(string name, int flags, bool force);
     }
 
-    [StructLayout(LayoutKind.Sequential)]
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     public class NetResource
     {
         public ResourceScope Scope;
@@ -74,7 +76,7 @@ namespace AVUpdate
         Remembered,
         Recent,
         Context
-    };
+    }
 
     public enum ResourceType : int
     {

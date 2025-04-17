@@ -12,10 +12,10 @@
             <materialDesign:Card materialDesign:ElevationAssist.Elevation="Dp4" Padding="16">
                 <Grid>
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
                     <!-- Заголовок -->
@@ -25,7 +25,7 @@
                                TextAlignment="Center"
                                HorizontalAlignment="Center"
                                Foreground="{DynamicResource MaterialDesignBody}"
-                               Margin="0,0,0,20"/>
+                               Margin="0,0,0,20" />
 
                     <!-- Основной блок -->
                     <StackPanel Grid.Row="1" Margin="0,0,0,10">
@@ -33,13 +33,13 @@
                                    Text="Архив: -"
                                    Foreground="{DynamicResource MaterialDesignBody}"
                                    FontStyle="Italic"
-                                   Margin="0,0,0,5"/>
+                                   Margin="0,0,0,5" />
 
                         <TextBlock x:Name="TargetPathText"
                                    Text="Путь копирования: -"
                                    Foreground="{DynamicResource MaterialDesignBody}"
                                    FontStyle="Italic"
-                                   Margin="0,0,0,15"/>
+                                   Margin="0,0,0,15" />
 
                         <!-- Статусы путей -->
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
@@ -47,7 +47,7 @@
                                        VerticalAlignment="Center"
                                        Foreground="{DynamicResource MaterialDesignBody}" />
                             <Ellipse x:Name="PrimaryStatus" Width="14" Height="14"
-                                     Fill="Gray" Margin="5,0"/>
+                                     Fill="Gray" Margin="5,0" />
                         </StackPanel>
 
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,10"
@@ -56,7 +56,7 @@
                                        VerticalAlignment="Center"
                                        Foreground="{DynamicResource MaterialDesignBody}" />
                             <Ellipse x:Name="SecondaryStatus" Width="14" Height="14"
-                                     Fill="Gray" Margin="5,0"/>
+                                     Fill="Gray" Margin="5,0" />
                         </StackPanel>
 
                         <!-- Кнопки управления -->
@@ -69,23 +69,23 @@
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                     <materialDesign:PackIcon Kind="Update" Width="24" Height="24" />
                                     <TextBlock Text="Обновить" Margin="8,0,0,0"
-                                               Foreground="{DynamicResource MaterialDesignBody}"/>
+                                               Foreground="{DynamicResource MaterialDesignBody}" />
                                 </StackPanel>
                             </Button>
 
                             <Button x:Name="SettingsButton"
                                     ToolTip="Открыть настройки приложения"
                                     Width="140" Height="40" Margin="5"
-                                    Click="SettingsButton_Click"
+                                    Click="SettingsButton_Click"                    
                                     Style="{DynamicResource MaterialDesignFlatButton}">
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                     <materialDesign:PackIcon Kind="Cog" Width="24" Height="24" />
                                     <TextBlock Text="Настройки" Margin="8,0,0,0"
-                                               Foreground="{DynamicResource MaterialDesignBody}"/>
+                                               Foreground="{DynamicResource MaterialDesignBody}" />
                                 </StackPanel>
                             </Button>
 
-                            <!-- Кнопка темы (иконка без лишнего отступа) -->
+                            <!-- Кнопка темы -->
                             <Button x:Name="ThemeButton"
                                     ToolTip="Переключить тему"
                                     Width="40" Height="40" Margin="5"
@@ -95,7 +95,7 @@
                                 <materialDesign:PackIcon x:Name="ThemeIcon"
                                                         Width="24" Height="24"
                                                         VerticalAlignment="Center"
-                                                        HorizontalAlignment="Center"/>
+                                                        HorizontalAlignment="Center" />
                             </Button>
 
                             <Button x:Name="CancelButton"
@@ -107,7 +107,7 @@
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                     <materialDesign:PackIcon Kind="Cancel" Width="24" Height="24" />
                                     <TextBlock Text="Отмена" Margin="8,0,0,0"
-                                               Foreground="{DynamicResource MaterialDesignBody}"/>
+                                               Foreground="{DynamicResource MaterialDesignBody}" />
                                 </StackPanel>
                             </Button>
                         </StackPanel>
